@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<VBox xmlns="http://javafx.com/javafx/21.0.2"
+      xmlns:fx="http://javafx.com/fxml"
+      spacing="10"
+      fx:controller="ftp.gusamyky.client.FileTabController">
+    <padding>
+        <javafx.geometry.Insets top="10" right="10" bottom="10" left="10"/>
+    </padding>
+    <Label text="Transfer plików" style="-fx-font-size: 16;" />
+    <HBox spacing="10">
+        <TextField fx:id="filterField" promptText="Filtruj pliki po nazwie..." />
+        <Button text="Odśwież listę" fx:id="refreshFilesButton" />
+        <Button text="UPLOAD" fx:id="uploadButton" />
+    </HBox>
+    <ScrollPane fitToWidth="true" prefHeight="300">
+        <VBox fx:id="filesListVBox" spacing="8">
+            <padding>
+                <Insets top="10" right="10" bottom="10" left="10"/>
+            </padding>
+        </VBox>
+    </ScrollPane>
+    <TextArea fx:id="outputArea" editable="false" wrapText="true" style="-fx-font-family: 'monospace'; -fx-font-size: 13;" />
+</VBox>
