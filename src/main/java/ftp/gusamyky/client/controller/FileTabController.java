@@ -84,7 +84,7 @@ public class FileTabController {
                     hideProgressBar();
                     outputArea.appendText("Błąd pobierania pliku: " + ex.getMessage() + "\n");
                 },
-                progress -> progressBar.setProgress(progress));
+                progress -> javafx.application.Platform.runLater(() -> progressBar.setProgress(progress)));
     }
 
     private void saveFileAs(RemoteFile file) {
@@ -111,7 +111,7 @@ public class FileTabController {
                         hideProgressBar();
                         outputArea.appendText("Błąd pobierania pliku: " + ex.getMessage() + "\n");
                     },
-                    progress -> progressBar.setProgress(progress));
+                    progress -> javafx.application.Platform.runLater(() -> progressBar.setProgress(progress)));
         }
     }
 
@@ -138,7 +138,7 @@ public class FileTabController {
                         hideProgressBar();
                         outputArea.appendText("Błąd wysyłania pliku: " + ex.getMessage() + "\n");
                     },
-                    progress -> progressBar.setProgress(progress));
+                    progress -> javafx.application.Platform.runLater(() -> progressBar.setProgress(progress)));
         }
     }
 
