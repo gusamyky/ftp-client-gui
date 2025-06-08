@@ -7,15 +7,15 @@
 <VBox xmlns:fx="http://javafx.com/fxml"
       xmlns="http://javafx.com/javafx/21.0.2"
       spacing="10"
-      fx:controller="ftp.gusamyky.client.FileTabController">
+      fx:controller="ftp.gusamyky.client.controller.FileTabController">
     <padding>
         <javafx.geometry.Insets top="10" right="10" bottom="10" left="10"/>
     </padding>
-    <Label text="Transfer plików" style="-fx-font-size: 16;"/>
+    <Label text="Pliki na serwerze" style="-fx-font-size: 16;"/>
     <HBox spacing="10">
         <TextField fx:id="filterField" promptText="Filtruj pliki po nazwie..."/>
         <Button text="Odśwież listę" fx:id="refreshFilesButton"/>
-        <Button text="UPLOAD" fx:id="uploadButton"/>
+        <Button text="Wyślij" fx:id="uploadButton"/>
     </HBox>
     <ListView fx:id="filesListView" prefHeight="300">
         <placeholder>
@@ -24,4 +24,5 @@
     </ListView>
     <TextArea fx:id="outputArea" editable="false" wrapText="true"
               style="-fx-font-family: 'monospace'; -fx-font-size: 13;"/>
+    <ProgressBar fx:id="progressBar" prefWidth="400" progress="0.0" visible="false"/>
 </VBox>

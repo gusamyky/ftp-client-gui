@@ -1,4 +1,4 @@
-package ftp.gusamyky.client.service;
+package ftp.gusamyky.client.service.network;
 
 import ftp.gusamyky.client.model.HistoryItem;
 import ftp.gusamyky.client.model.RemoteFile;
@@ -9,6 +9,7 @@ import javafx.collections.ObservableList;
 import java.io.*;
 import java.net.Socket;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.DoubleConsumer;
 
 /**
  * Serwis sieciowy obsługujący połączenie z serwerem FTP oraz operacje sieciowe.
@@ -324,6 +325,100 @@ public class ClientNetworkService {
                 ftp.gusamyky.client.util.ExceptionAlertUtil
                         .showConnectionError("Błąd wysyłania komendy: " + e.getMessage());
                 return "Błąd: " + e.getMessage();
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public boolean downloadFileWithProgress(String filename, java.nio.file.Path localPath, DoubleConsumer onProgress) {
+        lock.lock();
+        try {
+            if (!checkConnectionAndNotify("Pobieranie pliku"))
+                return false;
+            if (filename == null || filename.isEmpty())
+                return false;
+            try {
+                writer.write("DOWNLOAD " + filename + "\n");
+                writer.flush();
+                String sizeLine = reader.readLine();
+                if (sizeLine == null || sizeLine.startsWith("DOWNLOAD ERROR")) {
+                    ftp.gusamyky.client.util.ExceptionAlertUtil.showError("Błąd pobierania pliku: " + sizeLine);
+                    return false;
+                }
+                long fileSize = Long.parseLong(sizeLine);
+                java.nio.file.Path path = (localPath != null) ? localPath : getDefaultDownloadPath(filename);
+                java.nio.file.Files.createDirectories(path.getParent());
+                try (OutputStream fileOut = java.nio.file.Files.newOutputStream(path)) {
+                    InputStream in = socket.getInputStream();
+                    byte[] buffer = new byte[4096];
+                    long received = 0;
+                    while (received < fileSize) {
+                        int toRead = (int) Math.min(buffer.length, fileSize - received);
+                        int read = in.read(buffer, 0, toRead);
+                        if (read == -1)
+                            break;
+                        fileOut.write(buffer, 0, read);
+                        received += read;
+                        if (onProgress != null && fileSize > 0) {
+                            double progress = (double) received / fileSize;
+                            javafx.application.Platform.runLater(() -> onProgress.accept(progress));
+                        }
+                    }
+                }
+                return true;
+            } catch (Exception e) {
+                disconnect();
+                ftp.gusamyky.client.util.ExceptionAlertUtil
+                        .showConnectionError("Błąd pobierania pliku: " + e.getMessage());
+                return false;
+            }
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    public boolean uploadFileWithProgress(java.io.File file, DoubleConsumer onProgress) {
+        lock.lock();
+        try {
+            if (!checkConnectionAndNotify("Wysyłanie pliku"))
+                return false;
+            if (file == null)
+                return false;
+            String filename = file.getName();
+            try {
+                writer.write("UPLOAD " + filename + "\n");
+                writer.flush();
+                String ready = reader.readLine();
+                if (!"READY".equals(ready)) {
+                    ftp.gusamyky.client.util.ExceptionAlertUtil.showError("UPLOAD ERROR: Server not ready");
+                    return false;
+                }
+                long fileSize = file.length();
+                writer.write(fileSize + "\n");
+                writer.flush();
+                try (InputStream fileIn = new java.io.FileInputStream(file)) {
+                    OutputStream out = socket.getOutputStream();
+                    byte[] buffer = new byte[4096];
+                    long sent = 0;
+                    int read;
+                    while ((read = fileIn.read(buffer)) != -1) {
+                        out.write(buffer, 0, read);
+                        sent += read;
+                        if (onProgress != null && fileSize > 0) {
+                            double progress = (double) sent / fileSize;
+                            javafx.application.Platform.runLater(() -> onProgress.accept(progress));
+                        }
+                    }
+                    out.flush();
+                }
+                String response = reader.readLine();
+                return response != null && response.startsWith("UPLOAD OK");
+            } catch (Exception e) {
+                disconnect();
+                ftp.gusamyky.client.util.ExceptionAlertUtil
+                        .showConnectionError("Błąd wysyłania pliku: " + e.getMessage());
+                return false;
             }
         } finally {
             lock.unlock();
