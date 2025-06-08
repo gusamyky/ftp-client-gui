@@ -1,4 +1,4 @@
-package ftp.gusamyky.client.service;
+package ftp.gusamyky.client.service.network;
 
 import ftp.gusamyky.client.model.HistoryItem;
 import ftp.gusamyky.client.model.RemoteFile;
@@ -328,5 +328,21 @@ public class ClientNetworkService {
         } finally {
             lock.unlock();
         }
+    }
+
+    public ReentrantLock getLock() {
+        return lock;
+    }
+
+    public BufferedWriter getWriter() {
+        return writer;
+    }
+
+    public BufferedReader getReader() {
+        return reader;
+    }
+
+    public Socket getSocket() {
+        return socket;
     }
 }

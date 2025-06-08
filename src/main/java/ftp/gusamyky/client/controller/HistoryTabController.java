@@ -1,20 +1,29 @@
-package ftp.gusamyky.client;
+package ftp.gusamyky.client.controller;
 
-import javafx.fxml.FXML;
-import javafx.scene.control.*;
-import java.io.File;
-import ftp.gusamyky.client.service.ClientNetworkService;
 import ftp.gusamyky.client.model.AppState;
 import ftp.gusamyky.client.model.HistoryItem;
+import ftp.gusamyky.client.service.factory.RepositoryFactory;
+import ftp.gusamyky.client.service.repository.i_repository.IHistoryRepositoryAsync;
+import ftp.gusamyky.client.util.HistoryExportUtil;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.fxml.FXML;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
 import javafx.stage.FileChooser;
-import ftp.gusamyky.client.util.HistoryExportUtil;
+
+import java.io.File;
 
 /**
  * Kontroler zakładki historii operacji.
  */
 public class HistoryTabController {
+    private final ObservableList<HistoryItem> historyItems = FXCollections.observableArrayList();
+    private final Label notLoggedInPlaceholder = new Label("Musisz być zalogowany, aby zobaczyć historię.");
+    private final Label emptyPlaceholder = new Label("Brak historii operacji.");
+    private final IHistoryRepositoryAsync historyRepositoryAsync = RepositoryFactory.getHistoryRepository();
     @FXML
     private Button refreshHistoryButton;
     @FXML
@@ -23,10 +32,6 @@ public class HistoryTabController {
     private Button importHistoryButton;
     @FXML
     private ListView<HistoryItem> historyListView;
-
-    private final ObservableList<HistoryItem> historyItems = FXCollections.observableArrayList();
-    private final Label notLoggedInPlaceholder = new Label("Musisz być zalogowany, aby zobaczyć historię.");
-    private final Label emptyPlaceholder = new Label("Brak historii operacji.");
 
     /**
      * Inicjalizuje kontroler (ustawia obsługę przycisków i placeholdery).
@@ -83,11 +88,17 @@ public class HistoryTabController {
             historyListView.setPlaceholder(notLoggedInPlaceholder);
             return;
         }
-        ObservableList<HistoryItem> history = ClientNetworkService.getInstance()
-                .fetchHistory(AppState.getInstance().getLoggedUser());
-        AppState.getInstance().getHistory().setAll(history);
-        historyItems.setAll(history);
-        historyListView.setPlaceholder(emptyPlaceholder);
+        historyRepositoryAsync.fetchHistoryAsync(
+                AppState.getInstance().getLoggedUser(),
+                history -> {
+                    AppState.getInstance().getHistory().setAll(history);
+                    historyItems.setAll(history);
+                    historyListView.setPlaceholder(emptyPlaceholder);
+                },
+                ex -> {
+                    historyItems.clear();
+                    historyListView.setPlaceholder(new Label("Błąd pobierania historii: " + ex.getMessage()));
+                });
     }
 
     private static class HistoryItemCell extends ListCell<HistoryItem> {

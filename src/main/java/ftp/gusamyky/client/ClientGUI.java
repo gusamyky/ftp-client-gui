@@ -1,7 +1,8 @@
 package ftp.gusamyky.client;
 
+import ftp.gusamyky.client.controller.LoginTabController;
 import ftp.gusamyky.client.model.AppState;
-import ftp.gusamyky.client.service.ClientNetworkService;
+import ftp.gusamyky.client.service.network.ClientNetworkService;
 import ftp.gusamyky.client.util.ExceptionAlertUtil;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -64,6 +65,17 @@ public class ClientGUI extends Application {
         consoleTab.setClosable(false);
 
         tabPane.getTabs().addAll(loginTab, registerTab, filesTab, historyTab, consoleTab);
+
+        // Blokowanie tabów logowania/rejestracji po zalogowaniu
+        AppState.getInstance().loggedUserProperty().addListener((obs, oldUser, newUser) -> {
+            boolean loggedIn = newUser != null;
+            loginTab.setDisable(loggedIn);
+            registerTab.setDisable(loggedIn);
+        });
+        // Ustaw stan początkowy
+        boolean loggedIn = AppState.getInstance().getLoggedUser() != null;
+        loginTab.setDisable(loggedIn);
+        registerTab.setDisable(loggedIn);
 
         Scene scene = new Scene(tabPane, 700, 500);
         scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/client/app.css")).toExternalForm());

@@ -4,6 +4,8 @@ import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.control.TextArea;
+import javafx.beans.property.ObjectProperty;
+import javafx.beans.property.SimpleObjectProperty;
 
 /**
  * Singleton przechowujący globalny stan aplikacji.
@@ -12,7 +14,7 @@ public class AppState {
     private static AppState instance;
     private final ObservableList<RemoteFile> remoteFiles = FXCollections.observableArrayList();
     private final ObservableList<HistoryItem> history = FXCollections.observableArrayList();
-    private User loggedUser;
+    private final ObjectProperty<User> loggedUserProperty = new SimpleObjectProperty<>(null);
 
     private AppState() {
     }
@@ -49,11 +51,15 @@ public class AppState {
     }
 
     public User getLoggedUser() {
-        return loggedUser;
+        return loggedUserProperty.get();
     }
 
     public void setLoggedUser(User user) {
-        this.loggedUser = user;
+        loggedUserProperty.set(user);
+    }
+
+    public ObjectProperty<User> loggedUserProperty() {
+        return loggedUserProperty;
     }
 
     public ObservableList<RemoteFile> getRemoteFiles() {
