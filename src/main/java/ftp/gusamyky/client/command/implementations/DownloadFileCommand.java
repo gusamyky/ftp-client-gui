@@ -3,6 +3,7 @@ package ftp.gusamyky.client.command.implementations;
 import ftp.gusamyky.client.command.interfaces.ClientCommand;
 import ftp.gusamyky.client.service.ClientNetworkService;
 import java.nio.file.Path;
+import java.io.IOException;
 
 /**
  * Komenda pobierania pliku z serwera.
@@ -23,12 +24,12 @@ public class DownloadFileCommand implements ClientCommand {
     }
 
     @Override
-    public void execute() throws Exception {
+    public void execute() throws IOException {
         boolean result = (localPath == null)
                 ? networkService.downloadFile(remoteFileName)
                 : networkService.downloadFile(remoteFileName, localPath);
         if (!result)
-            throw new Exception("Download failed for " + remoteFileName);
+            throw new IOException("Download failed for " + remoteFileName);
     }
 
     @Override

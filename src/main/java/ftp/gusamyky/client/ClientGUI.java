@@ -86,7 +86,7 @@ public class ClientGUI extends Application {
     private void wireControllers() {
         // Po udanym logowaniu przełącz na zakładkę "Pliki"
         loginTabController.setOnLoginSuccess(() -> {
-            appState.setLoggedUser(new ftp.gusamyky.client.model.User(loginTabController.getLoginUser()));
+            appState.setLoggedUser(new ftp.gusamyky.client.model.User(loginTabController.getLoginUsername()));
             tabPane.getSelectionModel().select(filesTab);
         });
     }

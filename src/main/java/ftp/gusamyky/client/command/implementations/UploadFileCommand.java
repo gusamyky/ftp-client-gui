@@ -3,6 +3,7 @@ package ftp.gusamyky.client.command.implementations;
 import ftp.gusamyky.client.command.interfaces.ClientCommand;
 import ftp.gusamyky.client.service.ClientNetworkService;
 import java.io.File;
+import java.io.IOException;
 
 /**
  * Komenda wysyłania pliku na serwer.
@@ -17,10 +18,10 @@ public class UploadFileCommand implements ClientCommand {
     }
 
     @Override
-    public void execute() throws Exception {
+    public void execute() throws IOException {
         boolean result = networkService.uploadFile(file);
         if (!result)
-            throw new Exception("Upload failed for " + file.getName());
+            throw new IOException("Upload failed for " + file.getName());
     }
 
     @Override

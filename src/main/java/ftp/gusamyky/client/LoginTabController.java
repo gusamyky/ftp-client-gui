@@ -65,7 +65,7 @@ public class LoginTabController {
      * 
      * @return login
      */
-    public String getLoginUser() {
+    public String getLoginUsername() {
         return loginUserField.getText();
     }
 }
