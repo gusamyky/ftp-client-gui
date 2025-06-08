@@ -1,0 +1,77 @@
+/* Główne tło aplikacji */
+.root {
+    -fx-background-color: #f5f7fa;
+    -fx-font-family: 'Segoe UI', 'Arial', sans-serif;
+    -fx-font-size: 14px;
+}
+
+/* Nagłówki */
+.label {
+    -fx-font-size: 15px;
+    -fx-text-fill: #263238;
+}
+
+.label[styleClass~="header"] {
+    -fx-font-size: 18px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #1976d2;
+}
+
+/* Przyciski */
+.button {
+    -fx-background-color: linear-gradient(to bottom, #64b5f6, #1976d2);
+    -fx-text-fill: white;
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-font-weight: bold;
+    -fx-cursor: hand;
+    -fx-effect: dropshadow(gaussian, #90caf9, 2, 0, 0, 1);
+    -fx-padding: 7 18 7 18;
+    -fx-border-color: #1976d2;
+}
+
+.button:pressed {
+    -fx-background-color: #1565c0;
+}
+
+/* Pola tekstowe */
+.text-field,
+.password-field {
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-color: #90caf9;
+    -fx-background-color: #e3f2fd;
+    -fx-padding: 6 10 6 10;
+}
+
+/* TextArea */
+.text-area {
+    -fx-background-radius: 6;
+    -fx-border-radius: 6;
+    -fx-border-color: #90caf9;
+    -fx-background-color: #e3f2fd;
+    -fx-font-family: 'Fira Mono', 'monospace';
+    -fx-font-size: 13px;
+}
+
+/* VBox/HBox spacing */
+.vbox,
+.hbox {
+    -fx-spacing: 10;
+}
+
+/* ScrollBar */
+.scroll-bar:vertical,
+.scroll-bar:horizontal {
+    -fx-background-color: #e3f2fd;
+}
+
+/* Specjalne style dla przycisków eksport/import */
+#exportHistoryButton {
+    -fx-background-color: linear-gradient(to bottom, #43a047, #388e3c);
+}
+
+#importHistoryButton {
+    -fx-background-color: linear-gradient(to bottom, #fbc02d, #f9a825);
+    -fx-text-fill: #263238;
+}

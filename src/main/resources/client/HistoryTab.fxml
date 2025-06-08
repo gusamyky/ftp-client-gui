@@ -20,9 +20,18 @@
                 text="Odśwież"
                 prefWidth="120"
                 style="-fx-background-color: #64b5f6; -fx-text-fill: white;"/>
+        <Button fx:id="exportHistoryButton"
+                text="Eksportuj historię"
+                prefWidth="150"
+                style="-fx-background-color: #388e3c; -fx-text-fill: white;"/>
+        <Button fx:id="importHistoryButton"
+                text="Importuj historię"
+                prefWidth="150"
+                style="-fx-background-color: #fbc02d; -fx-text-fill: black;"/>
     </HBox>
-    <TextArea fx:id="historyArea"
-              editable="false"
-              wrapText="true"
-              style="-fx-font-family: 'monospace'; -fx-font-size: 13;"/>
+    <ListView fx:id="historyListView" prefHeight="300">
+        <placeholder>
+            <Label text="Brak historii operacji." style="-fx-text-fill: #888; -fx-font-style: italic;"/>
+        </placeholder>
+    </ListView>
 </VBox>
