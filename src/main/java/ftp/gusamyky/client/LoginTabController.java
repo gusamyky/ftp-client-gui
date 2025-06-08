@@ -3,11 +3,13 @@ package ftp.gusamyky.client;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.paint.Color;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.net.Socket;
+import ftp.gusamyky.client.service.ClientNetworkService;
+import ftp.gusamyky.client.model.AppState;
+import ftp.gusamyky.client.model.User;
 
+/**
+ * Kontroler zakładki logowania użytkownika.
+ */
 public class LoginTabController {
     @FXML
     private TextField loginUserField;
@@ -18,21 +20,20 @@ public class LoginTabController {
     @FXML
     private Label loginStatusLabel;
 
-    private Socket socket;
-    private BufferedReader reader;
-    private BufferedWriter writer;
     private Runnable onLoginSuccess;
 
-    public void setSocket(Socket socket, BufferedReader reader, BufferedWriter writer) {
-        this.socket = socket;
-        this.reader = reader;
-        this.writer = writer;
-    }
-
+    /**
+     * Ustawia callback po udanym logowaniu.
+     * 
+     * @param onLoginSuccess callback
+     */
     public void setOnLoginSuccess(Runnable onLoginSuccess) {
         this.onLoginSuccess = onLoginSuccess;
     }
 
+    /**
+     * Inicjalizuje kontroler (ustawia obsługę przycisku logowania).
+     */
     @FXML
     public void initialize() {
         loginButton.setOnAction(e -> handleLogin());
@@ -46,24 +47,24 @@ public class LoginTabController {
             loginStatusLabel.setTextFill(Color.RED);
             return;
         }
-        try {
-            writer.write("LOGIN " + username + " " + password + "\n");
-            writer.flush();
-            String response = reader.readLine();
-            loginStatusLabel.setText(response);
-            if (response.startsWith("LOGIN OK")) {
-                loginStatusLabel.setTextFill(Color.GREEN);
-                if (onLoginSuccess != null)
-                    onLoginSuccess.run();
-            } else {
-                loginStatusLabel.setTextFill(Color.RED);
-            }
-        } catch (IOException e) {
-            loginStatusLabel.setText("Błąd połączenia: " + e.getMessage());
+        boolean success = ClientNetworkService.getInstance().login(username, password);
+        if (success) {
+            loginStatusLabel.setText("LOGIN OK");
+            loginStatusLabel.setTextFill(Color.GREEN);
+            AppState.getInstance().setLoggedUser(new User(username));
+            if (onLoginSuccess != null)
+                onLoginSuccess.run();
+        } else {
+            loginStatusLabel.setText("LOGIN ERROR");
             loginStatusLabel.setTextFill(Color.RED);
         }
     }
 
+    /**
+     * Zwraca login wpisany przez użytkownika.
+     * 
+     * @return login
+     */
     public String getLoginUsername() {
         return loginUserField.getText();
     }

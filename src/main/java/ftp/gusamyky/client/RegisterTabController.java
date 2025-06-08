@@ -3,11 +3,13 @@ package ftp.gusamyky.client;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.paint.Color;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.net.Socket;
+import ftp.gusamyky.client.service.ClientNetworkService;
+import ftp.gusamyky.client.model.AppState;
+import ftp.gusamyky.client.model.User;
 
+/**
+ * Kontroler zakładki rejestracji użytkownika.
+ */
 public class RegisterTabController {
     @FXML
     private TextField regUserField;
@@ -18,16 +20,9 @@ public class RegisterTabController {
     @FXML
     private Label regStatusLabel;
 
-    private Socket socket;
-    private BufferedReader reader;
-    private BufferedWriter writer;
-
-    public void setSocket(Socket socket, BufferedReader reader, BufferedWriter writer) {
-        this.socket = socket;
-        this.reader = reader;
-        this.writer = writer;
-    }
-
+    /**
+     * Inicjalizuje kontroler (ustawia obsługę przycisku rejestracji).
+     */
     @FXML
     public void initialize() {
         regButton.setOnAction(e -> handleRegister());
@@ -41,18 +36,13 @@ public class RegisterTabController {
             regStatusLabel.setTextFill(Color.RED);
             return;
         }
-        try {
-            writer.write("REGISTER " + username + " " + password + "\n");
-            writer.flush();
-            String response = reader.readLine();
-            regStatusLabel.setText(response);
-            if (response.startsWith("REGISTER OK")) {
-                regStatusLabel.setTextFill(Color.GREEN);
-            } else {
-                regStatusLabel.setTextFill(Color.RED);
-            }
-        } catch (IOException e) {
-            regStatusLabel.setText("Błąd połączenia: " + e.getMessage());
+        boolean success = ClientNetworkService.getInstance().register(username, password);
+        if (success) {
+            regStatusLabel.setText("REGISTER OK");
+            regStatusLabel.setTextFill(Color.GREEN);
+            AppState.getInstance().setLoggedUser(new User(username));
+        } else {
+            regStatusLabel.setText("REGISTER ERROR");
             regStatusLabel.setTextFill(Color.RED);
         }
     }

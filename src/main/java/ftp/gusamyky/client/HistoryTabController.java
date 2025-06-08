@@ -2,66 +2,104 @@ package ftp.gusamyky.client;
 
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.net.Socket;
+import java.io.File;
+import ftp.gusamyky.client.service.ClientNetworkService;
+import ftp.gusamyky.client.model.AppState;
+import ftp.gusamyky.client.model.HistoryItem;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.stage.FileChooser;
+import ftp.gusamyky.client.util.HistoryExportUtil;
 
+/**
+ * Kontroler zakładki historii operacji.
+ */
 public class HistoryTabController {
     @FXML
     private Button refreshHistoryButton;
     @FXML
-    private TextArea historyArea;
+    private Button exportHistoryButton;
+    @FXML
+    private Button importHistoryButton;
+    @FXML
+    private ListView<HistoryItem> historyListView;
 
-    private Socket socket;
-    private BufferedReader reader;
-    private BufferedWriter writer;
-    private String loggedUser;
+    private final ObservableList<HistoryItem> historyItems = FXCollections.observableArrayList();
+    private final Label notLoggedInPlaceholder = new Label("Musisz być zalogowany, aby zobaczyć historię.");
+    private final Label emptyPlaceholder = new Label("Brak historii operacji.");
 
-    public void setSocket(Socket socket, BufferedReader reader, BufferedWriter writer) {
-        this.socket = socket;
-        this.reader = reader;
-        this.writer = writer;
-    }
-
-    public void setLoggedUser(String username) {
-        this.loggedUser = username;
-    }
-
+    /**
+     * Inicjalizuje kontroler (ustawia obsługę przycisków i placeholdery).
+     */
     @FXML
     public void initialize() {
         refreshHistoryButton.setOnAction(e -> fetchHistory());
+        exportHistoryButton.setOnAction(e -> exportHistory());
+        importHistoryButton.setOnAction(e -> importHistory());
+        historyListView.setCellFactory(listView -> new HistoryItemCell());
+        historyListView.setItems(historyItems);
+        emptyPlaceholder.setStyle("-fx-text-fill: #888; -fx-font-style: italic;");
+        notLoggedInPlaceholder.setStyle("-fx-text-fill: #888; -fx-font-style: italic;");
+        historyListView.setPlaceholder(emptyPlaceholder);
+    }
+
+    private void exportHistory() {
+        if (!AppState.requireLoggedIn("history", null))
+            return;
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Eksportuj historię do pliku");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Pliki binarne", "*.bin"));
+        File file = fileChooser.showSaveDialog(null);
+        if (file != null) {
+            try {
+                HistoryExportUtil.exportToFile(AppState.getInstance().getHistory(), file.getAbsolutePath());
+            } catch (Exception e) {
+                ftp.gusamyky.client.util.ExceptionAlertUtil.showError("Błąd eksportu historii", e);
+            }
+        }
+    }
+
+    private void importHistory() {
+        if (!AppState.requireLoggedIn("history", null))
+            return;
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Importuj historię z pliku");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Pliki binarne", "*.bin"));
+        File file = fileChooser.showOpenDialog(null);
+        if (file != null) {
+            try {
+                ObservableList<HistoryItem> imported = HistoryExportUtil.importFromFile(file.getAbsolutePath());
+                AppState.getInstance().getHistory().setAll(imported);
+                historyItems.setAll(imported);
+            } catch (Exception e) {
+                ftp.gusamyky.client.util.ExceptionAlertUtil.showError("Błąd importu historii", e);
+            }
+        }
     }
 
     private void fetchHistory() {
-        if (loggedUser == null || loggedUser.isEmpty()) {
-            historyArea.setText("Zaloguj się, aby zobaczyć historię operacji.");
+        if (!AppState.requireLoggedIn("history", null)) {
+            historyItems.clear();
+            historyListView.setPlaceholder(notLoggedInPlaceholder);
             return;
         }
-        try {
-            writer.write("HISTORY " + loggedUser + "\n");
-            writer.flush();
-            StringBuilder sb = new StringBuilder();
-            String line = reader.readLine();
-            if (line == null) {
-                historyArea.setText("Błąd połączenia z serwerem.");
-                return;
-            }
-            if (line.startsWith("HISTORY:")) {
-                sb.append(line.substring(8)).append("\n");
-                while (reader.ready()) {
-                    String l = reader.readLine();
-                    if (l == null || l.isEmpty())
-                        break;
-                    sb.append(l).append("\n");
-                }
-                historyArea.setText(sb.toString());
-                historyArea.setScrollTop(Double.MAX_VALUE);
+        ObservableList<HistoryItem> history = ClientNetworkService.getInstance()
+                .fetchHistory(AppState.getInstance().getLoggedUser());
+        AppState.getInstance().getHistory().setAll(history);
+        historyItems.setAll(history);
+        historyListView.setPlaceholder(emptyPlaceholder);
+    }
+
+    private static class HistoryItemCell extends ListCell<HistoryItem> {
+        @Override
+        protected void updateItem(HistoryItem item, boolean empty) {
+            super.updateItem(item, empty);
+            if (empty || item == null) {
+                setText(null);
+                setGraphic(null);
             } else {
-                historyArea.setText(line);
+                setText(item.getTimestamp() + ": " + item.getOperation());
             }
-        } catch (IOException e) {
-            historyArea.setText("Błąd: " + e.getMessage());
         }
     }
 }
