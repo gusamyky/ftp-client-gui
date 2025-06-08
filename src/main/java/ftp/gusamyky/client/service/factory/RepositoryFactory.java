@@ -13,35 +13,55 @@ public class RepositoryFactory {
 
     public static ILoginRepositoryAsync getLoginRepository() {
         if (loginRepository == null) {
-            loginRepository = new LoginRepositoryAsync(ClientNetworkService.getInstance());
+            synchronized (RepositoryFactory.class) {
+                if (loginRepository == null) {
+                    loginRepository = new LoginRepositoryAsync(ClientNetworkService.getInstance());
+                }
+            }
         }
         return loginRepository;
     }
 
     public static IRegisterRepositoryAsync getRegisterRepository() {
         if (registerRepository == null) {
-            registerRepository = new RegisterRepositoryAsync(ClientNetworkService.getInstance());
+            synchronized (RepositoryFactory.class) {
+                if (registerRepository == null) {
+                    registerRepository = new RegisterRepositoryAsync(ClientNetworkService.getInstance());
+                }
+            }
         }
         return registerRepository;
     }
 
     public static IFileRepositoryAsync getFileRepository() {
         if (fileRepository == null) {
-            fileRepository = new FileRepositoryAsync(ClientNetworkService.getInstance());
+            synchronized (RepositoryFactory.class) {
+                if (fileRepository == null) {
+                    fileRepository = new FileRepositoryAsync(ClientNetworkService.getInstance());
+                }
+            }
         }
         return fileRepository;
     }
 
     public static IHistoryRepositoryAsync getHistoryRepository() {
         if (historyRepository == null) {
-            historyRepository = new HistoryRepositoryAsync(ClientNetworkService.getInstance());
+            synchronized (RepositoryFactory.class) {
+                if (historyRepository == null) {
+                    historyRepository = new HistoryRepositoryAsync(ClientNetworkService.getInstance());
+                }
+            }
         }
         return historyRepository;
     }
 
     public static IConsoleRepositoryAsync getConsoleRepository() {
         if (consoleRepository == null) {
-            consoleRepository = new ConsoleRepositoryAsync(ClientNetworkService.getInstance());
+            synchronized (RepositoryFactory.class) {
+                if (consoleRepository == null) {
+                    consoleRepository = new ConsoleRepositoryAsync(ClientNetworkService.getInstance());
+                }
+            }
         }
         return consoleRepository;
     }
