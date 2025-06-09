@@ -5,27 +5,16 @@ import java.io.InputStream;
 import java.util.Properties;
 
 /**
- * Utility class for managing application configuration.
- * Loads properties from config.properties file and provides access to them.
+ * Klasa zarządzająca konfiguracją aplikacji.
+ * Singleton.
  */
 public class ConfigManager {
-    private static final String CONFIG_FILE = "/config.properties";
     private static ConfigManager instance;
     private final Properties properties;
+    private static final String CONFIG_FILE = "/config.properties";
 
     private ConfigManager() {
         properties = new Properties();
-        loadProperties();
-    }
-
-    public static synchronized ConfigManager getInstance() {
-        if (instance == null) {
-            instance = new ConfigManager();
-        }
-        return instance;
-    }
-
-    private void loadProperties() {
         try (InputStream input = getClass().getResourceAsStream(CONFIG_FILE)) {
             if (input == null) {
                 throw new RuntimeException("Unable to find " + CONFIG_FILE);
@@ -36,6 +25,13 @@ public class ConfigManager {
         }
     }
 
+    public static synchronized ConfigManager getInstance() {
+        if (instance == null) {
+            instance = new ConfigManager();
+        }
+        return instance;
+    }
+
     public String getServerHost() {
         return properties.getProperty("server.host", "localhost");
     }
@@ -44,11 +40,27 @@ public class ConfigManager {
         return Integer.parseInt(properties.getProperty("server.port", "2121"));
     }
 
-    public String getClientDownloadsDir() {
-        return properties.getProperty("client.downloads.dir", "client_files");
+    public String getServerFilesDir() {
+        return properties.getProperty("server.files.dir", "server_files");
+    }
+
+    public String getClientFilesDir() {
+        return properties.getProperty("client.files.dir", "client_files");
     }
 
     public int getConnectionTimeout() {
-        return Integer.parseInt(properties.getProperty("client.connection.timeout", "5000"));
+        return Integer.parseInt(properties.getProperty("connection.timeout", "30000"));
+    }
+
+    public int getCloudRetryAttempts() {
+        return Integer.parseInt(properties.getProperty("cloud.retry.attempts", "3"));
+    }
+
+    public int getCloudRetryDelay() {
+        return Integer.parseInt(properties.getProperty("cloud.retry.delay", "5000"));
+    }
+
+    public int getCloudKeepaliveInterval() {
+        return Integer.parseInt(properties.getProperty("cloud.keepalive.interval", "30000"));
     }
 }

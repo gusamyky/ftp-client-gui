@@ -4,6 +4,8 @@ import ftp.gusamyky.client.model.HistoryItem;
 import ftp.gusamyky.client.model.RemoteFile;
 import ftp.gusamyky.client.model.User;
 import ftp.gusamyky.client.util.ConfigManager;
+import ftp.gusamyky.client.util.ExceptionAlertUtil;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
@@ -23,6 +25,7 @@ public class ClientNetworkService {
     private Socket socket;
     private BufferedReader reader;
     private BufferedWriter writer;
+    private boolean isConnecting = false;
 
     private ClientNetworkService() {
     }
@@ -35,35 +38,79 @@ public class ClientNetworkService {
     }
 
     public boolean isConnected() {
-        return socket != null && socket.isConnected() && !socket.isClosed();
+        return socket != null && socket.isConnected() && !socket.isClosed() && reader != null && writer != null;
     }
 
     public void connect(String host, int port) throws IOException {
+        if (isConnecting) {
+            System.out.println("[ClientNetworkService] Connection attempt already in progress");
+            throw new IOException("Connection attempt already in progress");
+        }
+
         lock.lock();
         try {
-            System.out.println("[ClientNetworkService] Próba połączenia z serwerem: " + host + ":" + port);
-            disconnect();
-            socket = new Socket(host, port);
-            reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-            String welcome = reader.readLine(); // Odczytaj powitanie serwera
-            System.out.println(
-                    "[ClientNetworkService] Połączono z serwerem: " + host + ":" + port + ". Powitanie: " + welcome);
-        } catch (IOException e) {
-            System.out.println(
-                    "[ClientNetworkService] Błąd połączenia z serwerem: " + host + ":" + port + " - " + e.getMessage());
-            throw e;
+            isConnecting = true;
+            int attempts = 0;
+            IOException lastException = null;
+
+            while (attempts < configManager.getCloudRetryAttempts()) {
+                try {
+                    System.out.println("[ClientNetworkService] Attempting to connect to " + host + ":" + port +
+                            " (Attempt " + (attempts + 1) + "/" + configManager.getCloudRetryAttempts() + ")");
+
+                    if (isConnected()) {
+                        System.out
+                                .println("[ClientNetworkService] Disconnecting existing connection before new attempt");
+                        disconnect();
+                    }
+
+                    socket = new Socket(host, port);
+                    socket.setSoTimeout(configManager.getConnectionTimeout());
+                    reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                    writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+
+                    // Read welcome message
+                    String welcome = reader.readLine();
+                    if (welcome == null) {
+                        throw new IOException("No welcome message received from server");
+                    }
+
+                    System.out.println("[ClientNetworkService] Successfully connected to " + host + ":" + port +
+                            ". Welcome message: " + welcome);
+                    return;
+                } catch (IOException e) {
+                    lastException = e;
+                    attempts++;
+                    System.out.println(
+                            "[ClientNetworkService] Connection attempt " + attempts + " failed: " + e.getMessage());
+
+                    if (attempts < configManager.getCloudRetryAttempts()) {
+                        System.out.println("[ClientNetworkService] Waiting " + configManager.getCloudRetryDelay() +
+                                "ms before next attempt...");
+                        try {
+                            Thread.sleep(configManager.getCloudRetryDelay());
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            throw new IOException("Connection interrupted", ie);
+                        }
+                    }
+                }
+            }
+            System.out
+                    .println("[ClientNetworkService] Failed to connect after " + attempts + " attempts. Last error: " +
+                            lastException.getMessage());
+            throw new IOException(
+                    "Failed to connect after " + attempts + " attempts. Last error: " + lastException.getMessage());
         } finally {
+            isConnecting = false;
             lock.unlock();
         }
     }
 
     public void disconnect() {
+        System.out.println("[ClientNetworkService] Disconnecting from server...");
         lock.lock();
         try {
-            if (reader != null || writer != null || socket != null) {
-                System.out.println("[ClientNetworkService] Rozłączanie z serwerem...");
-            }
             if (reader != null) {
                 try {
                     reader.close();
@@ -85,6 +132,7 @@ public class ClientNetworkService {
                 }
                 socket = null;
             }
+            System.out.println("[ClientNetworkService] Successfully disconnected");
         } finally {
             lock.unlock();
         }
@@ -92,8 +140,8 @@ public class ClientNetworkService {
 
     private boolean checkConnectionAndNotify(String operation) {
         if (!isConnected()) {
-            ftp.gusamyky.client.util.ExceptionAlertUtil.showConnectionError(
-                    "Brak połączenia z serwerem (strumienie nie są zainicjalizowane).\nOperacja: " + operation);
+            Platform.runLater(() -> ExceptionAlertUtil.showConnectionError(
+                    "Brak połączenia z serwerem (strumienie nie są zainicjalizowane).\nOperacja: " + operation));
             return false;
         }
         return true;
@@ -108,10 +156,14 @@ public class ClientNetworkService {
                 writer.write("LOGIN " + username + " " + password + "\n");
                 writer.flush();
                 String response = reader.readLine();
-                return response != null && response.startsWith("LOGIN OK");
+                boolean success = response != null && response.startsWith("LOGIN OK");
+                if (!success) {
+                    Platform.runLater(() -> ExceptionAlertUtil.showConnectionError("Błąd logowania: " + response));
+                }
+                return success;
             } catch (IOException e) {
                 disconnect();
-                ftp.gusamyky.client.util.ExceptionAlertUtil.showConnectionError("Błąd logowania: " + e.getMessage());
+                Platform.runLater(() -> ExceptionAlertUtil.showConnectionError("Błąd logowania: " + e.getMessage()));
                 return false;
             }
         } finally {
@@ -131,7 +183,7 @@ public class ClientNetworkService {
                 return response != null && response.startsWith("REGISTER OK");
             } catch (IOException e) {
                 disconnect();
-                ftp.gusamyky.client.util.ExceptionAlertUtil.showConnectionError("Błąd rejestracji: " + e.getMessage());
+                ExceptionAlertUtil.showConnectionError("Błąd rejestracji: " + e.getMessage());
                 return false;
             }
         } finally {
@@ -158,8 +210,7 @@ public class ClientNetworkService {
                 }
             } catch (IOException e) {
                 disconnect();
-                ftp.gusamyky.client.util.ExceptionAlertUtil
-                        .showConnectionError("Błąd pobierania listy plików: " + e.getMessage());
+                ExceptionAlertUtil.showConnectionError("Błąd pobierania listy plików: " + e.getMessage());
             }
             return files;
         } finally {
@@ -183,7 +234,7 @@ public class ClientNetworkService {
                 writer.flush();
                 String sizeLine = reader.readLine();
                 if (sizeLine == null || sizeLine.startsWith("DOWNLOAD ERROR")) {
-                    ftp.gusamyky.client.util.ExceptionAlertUtil.showError("Błąd pobierania pliku: " + sizeLine);
+                    ExceptionAlertUtil.showError("Błąd pobierania pliku: " + sizeLine);
                     return false;
                 }
                 long fileSize = Long.parseLong(sizeLine);
@@ -204,8 +255,7 @@ public class ClientNetworkService {
                 return true;
             } catch (Exception e) {
                 disconnect();
-                ftp.gusamyky.client.util.ExceptionAlertUtil
-                        .showConnectionError("Błąd pobierania pliku: " + e.getMessage());
+                ExceptionAlertUtil.showConnectionError("Błąd pobierania pliku: " + e.getMessage());
                 return false;
             }
         } finally {
@@ -215,7 +265,7 @@ public class ClientNetworkService {
 
     public java.nio.file.Path getDefaultDownloadPath(String filename) {
         String userHome = System.getProperty("user.home");
-        java.nio.file.Path downloads = java.nio.file.Paths.get(userHome, configManager.getClientDownloadsDir());
+        java.nio.file.Path downloads = java.nio.file.Paths.get(userHome, configManager.getClientFilesDir());
         if (!java.nio.file.Files.exists(downloads)) {
             downloads = java.nio.file.Paths.get(userHome, "Downloads");
         }
@@ -238,7 +288,7 @@ public class ClientNetworkService {
                 writer.flush();
                 String ready = reader.readLine();
                 if (!"READY".equals(ready)) {
-                    ftp.gusamyky.client.util.ExceptionAlertUtil.showError("UPLOAD ERROR: Server not ready");
+                    ExceptionAlertUtil.showError("UPLOAD ERROR: Server not ready");
                     return false;
                 }
                 long fileSize = file.length();
@@ -257,8 +307,7 @@ public class ClientNetworkService {
                 return response != null && response.startsWith("UPLOAD OK");
             } catch (Exception e) {
                 disconnect();
-                ftp.gusamyky.client.util.ExceptionAlertUtil
-                        .showConnectionError("Błąd wysyłania pliku: " + e.getMessage());
+                ExceptionAlertUtil.showConnectionError("Błąd wysyłania pliku: " + e.getMessage());
                 return false;
             }
         } finally {
@@ -324,8 +373,7 @@ public class ClientNetworkService {
                 return reader.readLine();
             } catch (IOException e) {
                 disconnect();
-                ftp.gusamyky.client.util.ExceptionAlertUtil
-                        .showConnectionError("Błąd wysyłania komendy: " + e.getMessage());
+                ExceptionAlertUtil.showConnectionError("Błąd wysyłania komendy: " + e.getMessage());
                 return "Błąd: " + e.getMessage();
             }
         } finally {
@@ -345,7 +393,7 @@ public class ClientNetworkService {
                 writer.flush();
                 String sizeLine = reader.readLine();
                 if (sizeLine == null || sizeLine.startsWith("DOWNLOAD ERROR")) {
-                    ftp.gusamyky.client.util.ExceptionAlertUtil.showError("Błąd pobierania pliku: " + sizeLine);
+                    ExceptionAlertUtil.showError("Błąd pobierania pliku: " + sizeLine);
                     return false;
                 }
                 long fileSize = Long.parseLong(sizeLine);
@@ -371,8 +419,7 @@ public class ClientNetworkService {
                 return true;
             } catch (Exception e) {
                 disconnect();
-                ftp.gusamyky.client.util.ExceptionAlertUtil
-                        .showConnectionError("Błąd pobierania pliku: " + e.getMessage());
+                ExceptionAlertUtil.showConnectionError("Błąd pobierania pliku: " + e.getMessage());
                 return false;
             }
         } finally {
@@ -393,7 +440,7 @@ public class ClientNetworkService {
                 writer.flush();
                 String ready = reader.readLine();
                 if (!"READY".equals(ready)) {
-                    ftp.gusamyky.client.util.ExceptionAlertUtil.showError("UPLOAD ERROR: Server not ready");
+                    ExceptionAlertUtil.showError("UPLOAD ERROR: Server not ready");
                     return false;
                 }
                 long fileSize = file.length();
@@ -418,8 +465,7 @@ public class ClientNetworkService {
                 return response != null && response.startsWith("UPLOAD OK");
             } catch (Exception e) {
                 disconnect();
-                ftp.gusamyky.client.util.ExceptionAlertUtil
-                        .showConnectionError("Błąd wysyłania pliku: " + e.getMessage());
+                ExceptionAlertUtil.showConnectionError("Błąd wysyłania pliku: " + e.getMessage());
                 return false;
             }
         } finally {
