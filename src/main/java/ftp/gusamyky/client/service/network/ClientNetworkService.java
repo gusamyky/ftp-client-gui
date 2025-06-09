@@ -3,6 +3,7 @@ package ftp.gusamyky.client.service.network;
 import ftp.gusamyky.client.model.HistoryItem;
 import ftp.gusamyky.client.model.RemoteFile;
 import ftp.gusamyky.client.model.User;
+import ftp.gusamyky.client.util.ConfigManager;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
@@ -18,6 +19,7 @@ import java.util.function.DoubleConsumer;
 public class ClientNetworkService {
     private static ClientNetworkService instance;
     private final ReentrantLock lock = new ReentrantLock();
+    private final ConfigManager configManager = ConfigManager.getInstance();
     private Socket socket;
     private BufferedReader reader;
     private BufferedWriter writer;
@@ -213,12 +215,12 @@ public class ClientNetworkService {
 
     public java.nio.file.Path getDefaultDownloadPath(String filename) {
         String userHome = System.getProperty("user.home");
-        java.nio.file.Path downloads = java.nio.file.Paths.get(userHome, "Downloads");
+        java.nio.file.Path downloads = java.nio.file.Paths.get(userHome, configManager.getClientDownloadsDir());
         if (!java.nio.file.Files.exists(downloads)) {
-            downloads = java.nio.file.Paths.get(userHome, "Pobrane");
+            downloads = java.nio.file.Paths.get(userHome, "Downloads");
         }
         if (!java.nio.file.Files.exists(downloads)) {
-            downloads = java.nio.file.Paths.get(userHome, "client_files");
+            downloads = java.nio.file.Paths.get(userHome, "Pobrane");
         }
         return downloads.resolve(filename);
     }
