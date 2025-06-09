@@ -10,6 +10,7 @@ import java.io.*;
 import java.net.Socket;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.DoubleConsumer;
+import javax.net.ssl.SSLSocketFactory;
 
 /**
  * Serwis sieciowy obsługujący połączenie z serwerem FTP oraz operacje sieciowe.
@@ -37,16 +38,25 @@ public class ClientNetworkService {
     }
 
     public void connect(String host, int port) throws IOException {
+        // Ustaw domyślny trustStore, jeśli nie jest ustawiony przez JVM
+        if (System.getProperty("javax.net.ssl.trustStore") == null) {
+            System.setProperty("javax.net.ssl.trustStore", "truststore.jks");
+        }
+        if (System.getProperty("javax.net.ssl.trustStorePassword") == null) {
+            System.setProperty("javax.net.ssl.trustStorePassword", "dysmex-wyBdod-nydfe7");
+        }
         lock.lock();
         try {
             System.out.println("[ClientNetworkService] Próba połączenia z serwerem: " + host + ":" + port);
             disconnect();
-            socket = new Socket(host, port);
+            SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+            socket = factory.createSocket(host, port);
             reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
             String welcome = reader.readLine(); // Odczytaj powitanie serwera
             System.out.println(
-                    "[ClientNetworkService] Połączono z serwerem: " + host + ":" + port + ". Powitanie: " + welcome);
+                    "[ClientNetworkService] Połączono z serwerem (SSL): " + host + ":" + port + ". Powitanie: "
+                            + welcome);
         } catch (IOException e) {
             System.out.println(
                     "[ClientNetworkService] Błąd połączenia z serwerem: " + host + ":" + port + " - " + e.getMessage());
