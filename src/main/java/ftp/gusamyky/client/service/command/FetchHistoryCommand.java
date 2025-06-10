@@ -1,0 +1,78 @@
+package ftp.gusamyky.client.service.command;
+
+import ftp.gusamyky.client.model.HistoryItem;
+import ftp.gusamyky.client.model.User;
+import ftp.gusamyky.client.service.network.ServerMessageHandler;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+
+import java.io.BufferedWriter;
+import java.io.IOException;
+
+public class FetchHistoryCommand implements NetworkCommand<ObservableList<HistoryItem>> {
+    private final User user;
+    private final BufferedWriter writer;
+    private final ServerMessageHandler messageHandler;
+
+    public FetchHistoryCommand(User user, BufferedWriter writer, ServerMessageHandler messageHandler) {
+        this.user = user;
+        this.writer = writer;
+        this.messageHandler = messageHandler;
+    }
+
+    @Override
+    public String getOperationName() {
+        return "pobierania historii";
+    }
+
+    @Override
+    public ObservableList<HistoryItem> execute() throws Exception {
+        ObservableList<HistoryItem> history = FXCollections.observableArrayList();
+
+        if (user == null) {
+            history.add(new HistoryItem("Zaloguj się, aby zobaczyć historię operacji.", ""));
+            return history;
+        }
+
+        writer.write("HISTORY " + user.getUsername() + "\n");
+        writer.flush();
+
+        String line = messageHandler.readLine(getOperationName());
+        if (messageHandler.isErrorResponse(line)) {
+            history.add(new HistoryItem(messageHandler.getErrorMessage(line), ""));
+            return history;
+        }
+
+        if (!line.startsWith("HISTORY:")) {
+            history.add(new HistoryItem(line, ""));
+            return history;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        String first = line.substring(8).trim();
+        if (!first.isEmpty() && !first.equals("(no operations)")) {
+            sb.append(first).append("\n");
+            while (true) {
+                try {
+                    String l = messageHandler.readLine();
+                    if (l == null || l.isEmpty()) {
+                        break;
+                    }
+                    sb.append(l).append("\n");
+                } catch (IOException e) {
+                    break;
+                }
+            }
+            String[] lines = sb.toString().split("\\n");
+            for (String histLine : lines) {
+                if (!histLine.isEmpty()) {
+                    history.add(new HistoryItem(histLine, ""));
+                }
+            }
+        } else if (first.equals("(no operations)")) {
+            history.add(new HistoryItem("Brak operacji w historii.", ""));
+        }
+
+        return history;
+    }
+}

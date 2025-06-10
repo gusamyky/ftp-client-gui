@@ -38,7 +38,13 @@ public class FileRepositoryAsync implements IFileRepositoryAsync {
         Task<Boolean> task = new Task<>() {
             @Override
             protected Boolean call() {
-                return networkService.downloadFileWithProgress(filename, null, onProgress);
+                try {
+                    return networkService.downloadFileWithProgress(filename, null,
+                            progress -> Platform.runLater(() -> onProgress.accept(progress)));
+                } catch (Exception e) {
+                    Platform.runLater(() -> onError.accept(e));
+                    return false;
+                }
             }
         };
         task.setOnSucceeded(e -> Platform.runLater(() -> onSuccess.accept(task.getValue())));
@@ -52,7 +58,13 @@ public class FileRepositoryAsync implements IFileRepositoryAsync {
         Task<Boolean> task = new Task<>() {
             @Override
             protected Boolean call() {
-                return networkService.downloadFileWithProgress(filename, localPath, onProgress);
+                try {
+                    return networkService.downloadFileWithProgress(filename, localPath,
+                            progress -> Platform.runLater(() -> onProgress.accept(progress)));
+                } catch (Exception e) {
+                    Platform.runLater(() -> onError.accept(e));
+                    return false;
+                }
             }
         };
         task.setOnSucceeded(e -> Platform.runLater(() -> onSuccess.accept(task.getValue())));
@@ -66,7 +78,13 @@ public class FileRepositoryAsync implements IFileRepositoryAsync {
         Task<Boolean> task = new Task<>() {
             @Override
             protected Boolean call() {
-                return networkService.uploadFileWithProgress(file, onProgress);
+                try {
+                    return networkService.uploadFileWithProgress(file,
+                            progress -> Platform.runLater(() -> onProgress.accept(progress)));
+                } catch (Exception e) {
+                    Platform.runLater(() -> onError.accept(e));
+                    return false;
+                }
             }
         };
         task.setOnSucceeded(e -> Platform.runLater(() -> onSuccess.accept(task.getValue())));

@@ -3,30 +3,31 @@ package ftp.gusamyky.client.service.network;
 import ftp.gusamyky.client.model.HistoryItem;
 import ftp.gusamyky.client.model.RemoteFile;
 import ftp.gusamyky.client.model.User;
+import ftp.gusamyky.client.service.command.*;
+import ftp.gusamyky.client.service.error.NetworkErrorHandler;
 import ftp.gusamyky.client.util.ConfigManager;
-import ftp.gusamyky.client.util.ExceptionAlertUtil;
-import javafx.application.Platform;
-import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
 import java.io.*;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.DoubleConsumer;
 
-/**
- * Serwis sieciowy obsługujący połączenie z serwerem FTP oraz operacje sieciowe.
- * Singleton.
- */
 public class ClientNetworkService {
     private static ClientNetworkService instance;
     private final ReentrantLock lock = new ReentrantLock();
     private final ConfigManager configManager = ConfigManager.getInstance();
+    private final NetworkErrorHandler errorHandler = NetworkErrorHandler.getInstance();
+    private final AtomicBoolean isConnecting = new AtomicBoolean(false);
     private Socket socket;
     private BufferedReader reader;
     private BufferedWriter writer;
-    private final AtomicBoolean isConnecting = new AtomicBoolean(false);
+    private ServerMessageHandler messageHandler;
+    private static final int SOCKET_BUFFER_SIZE = 65536; // 64KB buffer
+    private static final int SOCKET_TIMEOUT = 300000; // 5 minutes timeout
 
     private ClientNetworkService() {
     }
@@ -66,18 +67,30 @@ public class ClientNetworkService {
                     }
 
                     socket = new Socket(host, port);
-                    socket.setSoTimeout(configManager.getConnectionTimeout());
+                    socket.setSoTimeout(SOCKET_TIMEOUT);
+                    socket.setKeepAlive(true);
+                    socket.setTcpNoDelay(true);
+                    socket.setReceiveBufferSize(SOCKET_BUFFER_SIZE);
+                    socket.setSendBufferSize(SOCKET_BUFFER_SIZE);
+
                     reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                     writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+                    messageHandler = new ServerMessageHandler(reader);
 
-                    // Read welcome message
-                    String welcome = reader.readLine();
-                    if (welcome == null) {
+                    StringBuilder welcomeMsg = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        if ("END".equals(line))
+                            break;
+                        welcomeMsg.append(line).append("\n");
+                    }
+                    if (welcomeMsg.length() == 0) {
                         throw new IOException("No welcome message received from server");
                     }
 
                     System.out.println("[ClientNetworkService] Successfully connected to " + host + ":" + port +
-                            ". Welcome message: " + welcome);
+                            ". Welcome message: " + welcomeMsg.toString().trim());
+                    errorHandler.resetErrorState();
                     return;
                 } catch (IOException e) {
                     lastException = e;
@@ -133,6 +146,7 @@ public class ClientNetworkService {
                 }
                 socket = null;
             }
+            messageHandler = null;
             System.out.println("[ClientNetworkService] Successfully disconnected");
         } finally {
             lock.unlock();
@@ -141,8 +155,7 @@ public class ClientNetworkService {
 
     private boolean checkConnectionAndNotify(String operation) {
         if (!isConnected()) {
-            Platform.runLater(() -> ExceptionAlertUtil.showConnectionError(
-                    "Brak połączenia z serwerem (strumienie nie są zainicjalizowane).\nOperacja: " + operation));
+            errorHandler.handleError(operation, "Brak połączenia z serwerem");
             return false;
         }
         return true;
@@ -151,20 +164,14 @@ public class ClientNetworkService {
     public boolean login(String username, String password) {
         lock.lock();
         try {
-            if (!checkConnectionAndNotify("Logowanie"))
+            if (!checkConnectionAndNotify("logowania"))
                 return false;
             try {
-                writer.write("LOGIN " + username + " " + password + "\n");
-                writer.flush();
-                String response = reader.readLine();
-                boolean success = response != null && response.startsWith("LOGIN OK");
-                if (!success) {
-                    Platform.runLater(() -> ExceptionAlertUtil.showConnectionError("Błąd logowania: " + response));
-                }
-                return success;
-            } catch (IOException e) {
+                LoginCommand command = new LoginCommand(username, password, writer, messageHandler);
+                return command.execute();
+            } catch (Exception e) {
                 disconnect();
-                Platform.runLater(() -> ExceptionAlertUtil.showConnectionError("Błąd logowania: " + e.getMessage()));
+                errorHandler.handleError("logowania", e.getMessage());
                 return false;
             }
         } finally {
@@ -175,20 +182,14 @@ public class ClientNetworkService {
     public boolean register(String username, String password) {
         lock.lock();
         try {
-            if (!checkConnectionAndNotify("Rejestracja"))
+            if (!checkConnectionAndNotify("rejestracji"))
                 return false;
             try {
-                writer.write("REGISTER " + username + " " + password + "\n");
-                writer.flush();
-                String response = reader.readLine();
-                boolean success = response != null && response.startsWith("REGISTER OK");
-                if (!success) {
-                    Platform.runLater(() -> ExceptionAlertUtil.showConnectionError("Błąd rejestracji: " + response));
-                }
-                return success;
-            } catch (IOException e) {
+                RegisterCommand command = new RegisterCommand(username, password, writer, messageHandler);
+                return command.execute();
+            } catch (Exception e) {
                 disconnect();
-                Platform.runLater(() -> ExceptionAlertUtil.showConnectionError("Błąd rejestracji: " + e.getMessage()));
+                errorHandler.handleError("rejestracji", e.getMessage());
                 return false;
             }
         } finally {
@@ -199,25 +200,16 @@ public class ClientNetworkService {
     public ObservableList<RemoteFile> fetchRemoteFiles() {
         lock.lock();
         try {
-            if (!checkConnectionAndNotify("Pobieranie listy plików"))
-                return FXCollections.observableArrayList();
-            ObservableList<RemoteFile> files = FXCollections.observableArrayList();
+            if (!checkConnectionAndNotify("pobierania listy plików"))
+                return null;
             try {
-                writer.write("LIST\n");
-                writer.flush();
-                String response = reader.readLine();
-                if (response != null && response.startsWith("FILES:")) {
-                    String[] fileArr = response.substring(6).trim().split(" ");
-                    for (String f : fileArr) {
-                        if (!f.isBlank() && !f.equals("(brak"))
-                            files.add(new RemoteFile(f, "?"));
-                    }
-                }
-            } catch (IOException e) {
+                FetchRemoteFilesCommand command = new FetchRemoteFilesCommand(writer, messageHandler);
+                return command.execute();
+            } catch (Exception e) {
                 disconnect();
-                ExceptionAlertUtil.showConnectionError("Błąd pobierania listy plików: " + e.getMessage());
+                errorHandler.handleError("pobierania listy plików", e.getMessage());
+                return null;
             }
-            return files;
         } finally {
             lock.unlock();
         }
@@ -227,141 +219,39 @@ public class ClientNetworkService {
         return downloadFile(filename, getDefaultDownloadPath(filename));
     }
 
-    public boolean downloadFile(String filename, java.nio.file.Path localPath) {
-        lock.lock();
-        try {
-            if (!checkConnectionAndNotify("Pobieranie pliku"))
-                return false;
-            if (filename == null || filename.isEmpty())
-                return false;
-            try {
-                writer.write("DOWNLOAD " + filename + "\n");
-                writer.flush();
-                String sizeLine = reader.readLine();
-                if (sizeLine == null || sizeLine.startsWith("DOWNLOAD ERROR")) {
-                    ExceptionAlertUtil.showError("Błąd pobierania pliku: " + sizeLine);
-                    return false;
-                }
-                long fileSize = Long.parseLong(sizeLine);
-                java.nio.file.Files.createDirectories(localPath.getParent());
-                try (OutputStream fileOut = java.nio.file.Files.newOutputStream(localPath)) {
-                    InputStream in = socket.getInputStream();
-                    byte[] buffer = new byte[4096];
-                    long received = 0;
-                    while (received < fileSize) {
-                        int toRead = (int) Math.min(buffer.length, fileSize - received);
-                        int read = in.read(buffer, 0, toRead);
-                        if (read == -1)
-                            break;
-                        fileOut.write(buffer, 0, read);
-                        received += read;
-                    }
-                }
-                return true;
-            } catch (Exception e) {
-                disconnect();
-                ExceptionAlertUtil.showConnectionError("Błąd pobierania pliku: " + e.getMessage());
-                return false;
-            }
-        } finally {
-            lock.unlock();
-        }
+    public boolean downloadFile(String filename, Path localPath) {
+        return downloadFileWithProgress(filename, localPath, null);
     }
 
-    public java.nio.file.Path getDefaultDownloadPath(String filename) {
+    public Path getDefaultDownloadPath(String filename) {
         String userHome = System.getProperty("user.home");
-        java.nio.file.Path downloads = java.nio.file.Paths.get(userHome, configManager.getClientFilesDir());
-        if (!java.nio.file.Files.exists(downloads)) {
-            downloads = java.nio.file.Paths.get(userHome, "Downloads");
+        Path downloads = Path.of(userHome, configManager.getClientFilesDir());
+        if (!Files.exists(downloads)) {
+            downloads = Path.of(userHome, "Downloads");
         }
-        if (!java.nio.file.Files.exists(downloads)) {
-            downloads = java.nio.file.Paths.get(userHome, "Pobrane");
+        if (!Files.exists(downloads)) {
+            downloads = Path.of(userHome, "Pobrane");
         }
         return downloads.resolve(filename);
     }
 
-    public boolean uploadFile(java.io.File file) {
-        lock.lock();
-        try {
-            if (!checkConnectionAndNotify("Wysyłanie pliku"))
-                return false;
-            if (file == null)
-                return false;
-            String filename = file.getName();
-            try {
-                writer.write("UPLOAD " + filename + "\n");
-                writer.flush();
-                String ready = reader.readLine();
-                if (!"READY".equals(ready)) {
-                    ExceptionAlertUtil.showError("UPLOAD ERROR: Server not ready");
-                    return false;
-                }
-                long fileSize = file.length();
-                writer.write(fileSize + "\n");
-                writer.flush();
-                try (InputStream fileIn = new FileInputStream(file)) {
-                    OutputStream out = socket.getOutputStream();
-                    byte[] buffer = new byte[4096];
-                    int read;
-                    while ((read = fileIn.read(buffer)) != -1) {
-                        out.write(buffer, 0, read);
-                    }
-                    out.flush();
-                }
-                String response = reader.readLine();
-                return response != null && response.startsWith("UPLOAD OK");
-            } catch (Exception e) {
-                disconnect();
-                ExceptionAlertUtil.showConnectionError("Błąd wysyłania pliku: " + e.getMessage());
-                return false;
-            }
-        } finally {
-            lock.unlock();
-        }
+    public boolean uploadFile(File file) {
+        return uploadFileWithProgress(file, null);
     }
 
     public ObservableList<HistoryItem> fetchHistory(User user) {
         lock.lock();
         try {
-            ObservableList<HistoryItem> history = FXCollections.observableArrayList();
-            if (user == null) {
-                history.add(new HistoryItem("Zaloguj się, aby zobaczyć historię operacji.", ""));
-                return history;
-            }
-            if (!checkConnectionAndNotify("Pobieranie historii")) {
-                history.add(new HistoryItem("Błąd połączenia z serwerem.", ""));
-                return history;
-            }
+            if (!checkConnectionAndNotify("pobierania historii"))
+                return null;
             try {
-                writer.write("HISTORY " + user.getUsername() + "\n");
-                writer.flush();
-                String line = reader.readLine();
-                if (line == null) {
-                    history.add(new HistoryItem("Błąd połączenia z serwerem.", ""));
-                    return history;
-                }
-                if (line.startsWith("HISTORY:")) {
-                    StringBuilder sb = new StringBuilder();
-                    sb.append(line.substring(8)).append("\n");
-                    while (reader.ready()) {
-                        String l = reader.readLine();
-                        if (l == null || l.isEmpty())
-                            break;
-                        sb.append(l).append("\n");
-                    }
-                    // Każda linia jako osobny wpis historii
-                    String[] lines = sb.toString().split("\\n");
-                    for (String histLine : lines) {
-                        if (!histLine.isEmpty())
-                            history.add(new HistoryItem(histLine, ""));
-                    }
-                } else {
-                    history.add(new HistoryItem(line, ""));
-                }
-            } catch (IOException e) {
-                history.add(new HistoryItem("Błąd: " + e.getMessage(), ""));
+                FetchHistoryCommand command = new FetchHistoryCommand(user, writer, messageHandler);
+                return command.execute();
+            } catch (Exception e) {
+                disconnect();
+                errorHandler.handleError("pobierania historii", e.getMessage());
+                return null;
             }
-            return history;
         } finally {
             lock.unlock();
         }
@@ -370,15 +260,15 @@ public class ClientNetworkService {
     public String sendCommand(String command) {
         lock.lock();
         try {
-            if (!checkConnectionAndNotify("Wysyłanie komendy"))
+            if (!checkConnectionAndNotify("wysyłania komendy"))
                 return "Brak połączenia z serwerem.";
             try {
                 writer.write(command + "\n");
                 writer.flush();
-                return reader.readLine();
+                return messageHandler.readLine("wysyłania komendy");
             } catch (IOException e) {
                 disconnect();
-                ExceptionAlertUtil.showConnectionError("Błąd wysyłania komendy: " + e.getMessage());
+                errorHandler.handleError("wysyłania komendy", e.getMessage());
                 return "Błąd: " + e.getMessage();
             }
         } finally {
@@ -386,45 +276,18 @@ public class ClientNetworkService {
         }
     }
 
-    public boolean downloadFileWithProgress(String filename, java.nio.file.Path localPath, DoubleConsumer onProgress) {
+    public boolean downloadFileWithProgress(String filename, Path localPath, DoubleConsumer onProgress) {
         lock.lock();
         try {
-            if (!checkConnectionAndNotify("Pobieranie pliku"))
-                return false;
-            if (filename == null || filename.isEmpty())
+            if (!checkConnectionAndNotify("pobierania pliku"))
                 return false;
             try {
-                writer.write("DOWNLOAD " + filename + "\n");
-                writer.flush();
-                String sizeLine = reader.readLine();
-                if (sizeLine == null || sizeLine.startsWith("DOWNLOAD ERROR")) {
-                    ExceptionAlertUtil.showError("Błąd pobierania pliku: " + sizeLine);
-                    return false;
-                }
-                long fileSize = Long.parseLong(sizeLine);
-                java.nio.file.Path path = (localPath != null) ? localPath : getDefaultDownloadPath(filename);
-                java.nio.file.Files.createDirectories(path.getParent());
-                try (OutputStream fileOut = java.nio.file.Files.newOutputStream(path)) {
-                    InputStream in = socket.getInputStream();
-                    byte[] buffer = new byte[4096];
-                    long received = 0;
-                    while (received < fileSize) {
-                        int toRead = (int) Math.min(buffer.length, fileSize - received);
-                        int read = in.read(buffer, 0, toRead);
-                        if (read == -1)
-                            break;
-                        fileOut.write(buffer, 0, read);
-                        received += read;
-                        if (onProgress != null && fileSize > 0) {
-                            double progress = (double) received / fileSize;
-                            javafx.application.Platform.runLater(() -> onProgress.accept(progress));
-                        }
-                    }
-                }
-                return true;
+                DownloadFileCommand command = new DownloadFileCommand(filename, localPath, writer, messageHandler,
+                        socket, onProgress);
+                return command.execute();
             } catch (Exception e) {
                 disconnect();
-                ExceptionAlertUtil.showConnectionError("Błąd pobierania pliku: " + e.getMessage());
+                errorHandler.handleError("pobierania pliku", e.getMessage());
                 return false;
             }
         } finally {
@@ -432,45 +295,17 @@ public class ClientNetworkService {
         }
     }
 
-    public boolean uploadFileWithProgress(java.io.File file, DoubleConsumer onProgress) {
+    public boolean uploadFileWithProgress(File file, DoubleConsumer onProgress) {
         lock.lock();
         try {
-            if (!checkConnectionAndNotify("Wysyłanie pliku"))
+            if (!checkConnectionAndNotify("wysyłania pliku"))
                 return false;
-            if (file == null)
-                return false;
-            String filename = file.getName();
             try {
-                writer.write("UPLOAD " + filename + "\n");
-                writer.flush();
-                String ready = reader.readLine();
-                if (!"READY".equals(ready)) {
-                    ExceptionAlertUtil.showError("UPLOAD ERROR: Server not ready");
-                    return false;
-                }
-                long fileSize = file.length();
-                writer.write(fileSize + "\n");
-                writer.flush();
-                try (InputStream fileIn = new java.io.FileInputStream(file)) {
-                    OutputStream out = socket.getOutputStream();
-                    byte[] buffer = new byte[4096];
-                    long sent = 0;
-                    int read;
-                    while ((read = fileIn.read(buffer)) != -1) {
-                        out.write(buffer, 0, read);
-                        sent += read;
-                        if (onProgress != null && fileSize > 0) {
-                            double progress = (double) sent / fileSize;
-                            javafx.application.Platform.runLater(() -> onProgress.accept(progress));
-                        }
-                    }
-                    out.flush();
-                }
-                String response = reader.readLine();
-                return response != null && response.startsWith("UPLOAD OK");
+                UploadFileCommand command = new UploadFileCommand(file, writer, messageHandler, socket, onProgress);
+                return command.execute();
             } catch (Exception e) {
                 disconnect();
-                ExceptionAlertUtil.showConnectionError("Błąd wysyłania pliku: " + e.getMessage());
+                errorHandler.handleError("wysyłania pliku", e.getMessage());
                 return false;
             }
         } finally {
