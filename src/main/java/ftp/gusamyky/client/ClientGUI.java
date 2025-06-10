@@ -11,9 +11,8 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.image.Image;
 import javafx.stage.Stage;
-
-import java.util.Objects;
 
 public class ClientGUI extends Application {
     private final ClientNetworkService networkService = ClientNetworkService.getInstance();
@@ -80,8 +79,24 @@ public class ClientGUI extends Application {
         registerTab.setDisable(loggedIn);
 
         Scene scene = new Scene(tabPane, 800, 600);
-        scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/client/app.css")).toExternalForm());
+        try {
+            String cssPath = getClass().getResource("/client/app.css").toExternalForm();
+            scene.getStylesheets().add(cssPath);
+        } catch (NullPointerException e) {
+            System.err.println("Warning: Could not load CSS file. Application will run without custom styling.");
+        }
+
+        // Set title
         primaryStage.setTitle("FTP_FS Client GUI");
+
+        // Load application icon
+        try {
+            Image icon = new Image(getClass().getResourceAsStream("/icons/app-icon.png"));
+            primaryStage.getIcons().add(icon);
+        } catch (NullPointerException e) {
+            System.err.println("Warning: Could not load application icon.");
+        }
+
         primaryStage.setScene(scene);
         primaryStage.show();
 
