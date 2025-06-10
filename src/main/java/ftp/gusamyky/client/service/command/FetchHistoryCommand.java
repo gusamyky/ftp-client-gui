@@ -7,7 +7,6 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 
 import java.io.BufferedWriter;
-import java.io.IOException;
 
 public class FetchHistoryCommand implements NetworkCommand<ObservableList<HistoryItem>> {
     private final User user;
