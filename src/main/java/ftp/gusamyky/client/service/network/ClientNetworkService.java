@@ -11,6 +11,7 @@ import javafx.collections.ObservableList;
 
 import java.io.*;
 import java.net.Socket;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.DoubleConsumer;
 
@@ -25,7 +26,7 @@ public class ClientNetworkService {
     private Socket socket;
     private BufferedReader reader;
     private BufferedWriter writer;
-    private boolean isConnecting = false;
+    private final AtomicBoolean isConnecting = new AtomicBoolean(false);
 
     private ClientNetworkService() {
     }
@@ -42,14 +43,14 @@ public class ClientNetworkService {
     }
 
     public void connect(String host, int port) throws IOException {
-        if (isConnecting) {
-            System.out.println("[ClientNetworkService] Connection attempt already in progress");
-            throw new IOException("Connection attempt already in progress");
-        }
-
         lock.lock();
         try {
-            isConnecting = true;
+            if (isConnecting.get()) {
+                System.out.println("[ClientNetworkService] Connection attempt already in progress");
+                throw new IOException("Connection attempt already in progress");
+            }
+            isConnecting.set(true);
+
             int attempts = 0;
             IOException lastException = null;
 
@@ -102,7 +103,7 @@ public class ClientNetworkService {
             throw new IOException(
                     "Failed to connect after " + attempts + " attempts. Last error: " + lastException.getMessage());
         } finally {
-            isConnecting = false;
+            isConnecting.set(false);
             lock.unlock();
         }
     }
@@ -180,10 +181,14 @@ public class ClientNetworkService {
                 writer.write("REGISTER " + username + " " + password + "\n");
                 writer.flush();
                 String response = reader.readLine();
-                return response != null && response.startsWith("REGISTER OK");
+                boolean success = response != null && response.startsWith("REGISTER OK");
+                if (!success) {
+                    Platform.runLater(() -> ExceptionAlertUtil.showConnectionError("Błąd rejestracji: " + response));
+                }
+                return success;
             } catch (IOException e) {
                 disconnect();
-                ExceptionAlertUtil.showConnectionError("Błąd rejestracji: " + e.getMessage());
+                Platform.runLater(() -> ExceptionAlertUtil.showConnectionError("Błąd rejestracji: " + e.getMessage()));
                 return false;
             }
         } finally {
