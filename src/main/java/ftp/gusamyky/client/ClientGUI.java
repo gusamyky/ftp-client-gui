@@ -3,6 +3,7 @@ package ftp.gusamyky.client;
 import ftp.gusamyky.client.controller.LoginTabController;
 import ftp.gusamyky.client.model.AppState;
 import ftp.gusamyky.client.service.network.ClientNetworkService;
+import ftp.gusamyky.client.util.ConfigManager;
 import ftp.gusamyky.client.util.ExceptionAlertUtil;
 import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
@@ -17,6 +18,7 @@ import java.util.Objects;
 public class ClientGUI extends Application {
     private final ClientNetworkService networkService = ClientNetworkService.getInstance();
     private final AppState appState = AppState.getInstance();
+    private final ConfigManager configManager = ConfigManager.getInstance();
     private LoginTabController loginTabController;
     private TabPane tabPane;
     private Tab loginTab, registerTab, filesTab, historyTab, consoleTab;
@@ -77,7 +79,7 @@ public class ClientGUI extends Application {
         loginTab.setDisable(loggedIn);
         registerTab.setDisable(loggedIn);
 
-        Scene scene = new Scene(tabPane, 700, 500);
+        Scene scene = new Scene(tabPane, 800, 600);
         scene.getStylesheets().add(Objects.requireNonNull(getClass().getResource("/client/app.css")).toExternalForm());
         primaryStage.setTitle("FTP_FS Client GUI");
         primaryStage.setScene(scene);
@@ -89,7 +91,7 @@ public class ClientGUI extends Application {
 
     private void connectToServer() {
         try {
-            networkService.connect("localhost", 2121);
+            networkService.connect(configManager.getServerHost(), configManager.getServerPort());
         } catch (Exception e) {
             ExceptionAlertUtil.showConnectionError("Nie udało się połączyć z serwerem: " + e.getMessage());
         }
