@@ -22,7 +22,7 @@ public class LoginCommand implements NetworkCommand<Boolean> {
 
     @Override
     public String getOperationName() {
-        return "logowania";
+        return "LOGIN";
     }
 
     @Override

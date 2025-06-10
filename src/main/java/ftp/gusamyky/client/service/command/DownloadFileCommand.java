@@ -5,7 +5,10 @@ import ftp.gusamyky.client.service.network.ServerMessageHandler;
 import ftp.gusamyky.client.util.ConfigManager;
 import javafx.application.Platform;
 
-import java.io.*;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.file.Files;
@@ -26,7 +29,7 @@ public class DownloadFileCommand implements NetworkCommand<Boolean> {
     private final ConfigManager configManager;
 
     public DownloadFileCommand(String filename, Path localPath, BufferedWriter writer,
-            ServerMessageHandler messageHandler, Socket socket, DoubleConsumer onProgress) {
+                               ServerMessageHandler messageHandler, Socket socket, DoubleConsumer onProgress) {
         this.filename = filename;
         this.localPath = localPath;
         this.writer = writer;
@@ -51,7 +54,7 @@ public class DownloadFileCommand implements NetworkCommand<Boolean> {
 
     @Override
     public String getOperationName() {
-        return "pobierania pliku";
+        return "DOWNLOAD";
     }
 
     @Override

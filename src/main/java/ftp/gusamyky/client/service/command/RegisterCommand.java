@@ -13,7 +13,7 @@ public class RegisterCommand implements NetworkCommand<Boolean> {
     private final NetworkErrorHandler errorHandler;
 
     public RegisterCommand(String username, String password, BufferedWriter writer,
-            ServerMessageHandler messageHandler) {
+                           ServerMessageHandler messageHandler) {
         this.username = username;
         this.password = password;
         this.writer = writer;
@@ -23,7 +23,7 @@ public class RegisterCommand implements NetworkCommand<Boolean> {
 
     @Override
     public String getOperationName() {
-        return "rejestracji";
+        return "REGISTER";
     }
 
     @Override

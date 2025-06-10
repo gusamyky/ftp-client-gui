@@ -18,7 +18,7 @@ public class UploadFileCommand implements NetworkCommand<Boolean> {
     private final Socket socket;
 
     public UploadFileCommand(File file, BufferedWriter writer, ServerMessageHandler messageHandler, Socket socket,
-            DoubleConsumer onProgress) {
+                             DoubleConsumer onProgress) {
         this.file = file;
         this.writer = writer;
         this.messageHandler = messageHandler;
@@ -29,7 +29,7 @@ public class UploadFileCommand implements NetworkCommand<Boolean> {
 
     @Override
     public String getOperationName() {
-        return "wysyłania pliku";
+        return "UPLOAD";
     }
 
     @Override

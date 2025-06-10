@@ -24,7 +24,7 @@ public class FetchRemoteFilesCommand implements NetworkCommand<ObservableList<Re
 
     @Override
     public String getOperationName() {
-        return "pobierania listy plików";
+        return "FETCH_REMOTE_FILES";
     }
 
     @Override

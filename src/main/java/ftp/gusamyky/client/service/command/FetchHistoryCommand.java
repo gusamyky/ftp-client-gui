@@ -21,7 +21,7 @@ public class FetchHistoryCommand implements NetworkCommand<ObservableList<Histor
 
     @Override
     public String getOperationName() {
-        return "pobierania historii";
+        return "FETCH_HISTORY";
     }
 
     @Override
