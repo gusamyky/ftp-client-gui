@@ -26,8 +26,8 @@ public class ClientNetworkService {
     private BufferedReader reader;
     private BufferedWriter writer;
     private ServerMessageHandler messageHandler;
-    private static final int SOCKET_BUFFER_SIZE = 65536; // 64KB buffer
-    private static final int SOCKET_TIMEOUT = 300000; // 5 minutes timeout
+    private static final int SOCKET_BUFFER_SIZE = 65536;
+    private static final int SOCKET_TIMEOUT = 300000;
 
     private ClientNetworkService() {
     }

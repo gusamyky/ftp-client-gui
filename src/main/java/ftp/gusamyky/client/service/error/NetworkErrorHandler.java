@@ -19,7 +19,7 @@ public class NetworkErrorHandler {
 
     public void handleError(String operation, String errorMessage) {
         if (isErrorState) {
-            return; // Prevent multiple error messages
+            return;
         }
 
         isErrorState = true;

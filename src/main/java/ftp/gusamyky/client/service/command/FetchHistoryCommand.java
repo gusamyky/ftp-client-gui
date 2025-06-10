@@ -53,7 +53,7 @@ public class FetchHistoryCommand implements NetworkCommand<ObservableList<Histor
             return history;
         }
 
-        // Split entries by semicolon and process each one
+        // Split history entries by semicolon
         String[] entries = content.split(";");
         for (String entry : entries) {
             entry = entry.trim();

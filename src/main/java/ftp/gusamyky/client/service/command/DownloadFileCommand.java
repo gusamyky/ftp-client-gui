@@ -16,8 +16,8 @@ import java.nio.file.Path;
 import java.util.function.DoubleConsumer;
 
 public class DownloadFileCommand implements NetworkCommand<Boolean> {
-    private static final int BUFFER_SIZE = 16384; // 16KB buffer
-    private static final int PROGRESS_LOG_INTERVAL = 10; // Log every 10%
+    private static final int BUFFER_SIZE = 16384;
+    private static final int PROGRESS_LOG_INTERVAL = 10;
 
     private final String filename;
     private final Path localPath;
@@ -29,7 +29,7 @@ public class DownloadFileCommand implements NetworkCommand<Boolean> {
     private final ConfigManager configManager;
 
     public DownloadFileCommand(String filename, Path localPath, BufferedWriter writer,
-                               ServerMessageHandler messageHandler, Socket socket, DoubleConsumer onProgress) {
+            ServerMessageHandler messageHandler, Socket socket, DoubleConsumer onProgress) {
         this.filename = filename;
         this.localPath = localPath;
         this.writer = writer;
@@ -108,12 +108,10 @@ public class DownloadFileCommand implements NetworkCommand<Boolean> {
                         fileOut.write(buffer, 0, read);
                         received += read;
 
-                        // Calculate and report progress
                         if (onProgress != null && fileSize > 0) {
                             double progress = (double) received / fileSize;
                             int currentProgressPercent = (int) (progress * 100);
 
-                            // Log progress every 10%
                             if (currentProgressPercent >= lastProgressPercent + PROGRESS_LOG_INTERVAL) {
                                 System.out.printf("[Download] Progress: %d%% (%d/%d bytes)%n",
                                         currentProgressPercent, received, fileSize);
