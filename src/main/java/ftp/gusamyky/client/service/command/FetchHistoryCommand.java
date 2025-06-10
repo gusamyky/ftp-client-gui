@@ -48,29 +48,19 @@ public class FetchHistoryCommand implements NetworkCommand<ObservableList<Histor
             return history;
         }
 
-        StringBuilder sb = new StringBuilder();
-        String first = line.substring(8).trim();
-        if (!first.isEmpty() && !first.equals("(no operations)")) {
-            sb.append(first).append("\n");
-            while (true) {
-                try {
-                    String l = messageHandler.readLine();
-                    if (l == null || l.isEmpty()) {
-                        break;
-                    }
-                    sb.append(l).append("\n");
-                } catch (IOException e) {
-                    break;
-                }
-            }
-            String[] lines = sb.toString().split("\\n");
-            for (String histLine : lines) {
-                if (!histLine.isEmpty()) {
-                    history.add(new HistoryItem(histLine, ""));
-                }
-            }
-        } else if (first.equals("(no operations)")) {
+        String content = line.substring(8).trim();
+        if (content.equals("(no operations)")) {
             history.add(new HistoryItem("Brak operacji w historii.", ""));
+            return history;
+        }
+
+        // Split entries by semicolon and process each one
+        String[] entries = content.split(";");
+        for (String entry : entries) {
+            entry = entry.trim();
+            if (!entry.isEmpty()) {
+                history.add(new HistoryItem(entry, ""));
+            }
         }
 
         return history;
